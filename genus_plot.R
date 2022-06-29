@@ -1,0 +1,7 @@
+library(ggplot2)
+genus_taxa<-read.table("genus_plot.tsv",header=F)
+genus_taxa<-cbind(genus_taxa,rep("SNP44859",dim(genus_taxa)[1]))
+colnames(genus_taxa)<-c("Genus","Abundance","Sample")
+png("genus_plot.png")
+ggplot(genus_taxa,aes(x=Sample,y=Abundance,fill=Genus))+geom_bar(position="stack", stat="identity")
+dev.off()

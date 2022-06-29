@@ -1,0 +1,136 @@
+library(dada2)
+#library(DECIPHER)
+forward_reads <- c("SNP44859_S262_L001_R1.fastq")
+reverse_reads <- c("SNP44859_S262_L001_R2.fastq")
+filtered_forward_reads <- c("SNP44859_S262_L001_R1_dada2filtered.fastq")
+filtered_reverse_reads <- c("SNP44859_S262_L001_R2_dada2filtered.fastq")
+filtered_out <- filterAndTrim(forward_reads, filtered_forward_reads, reverse_reads, filtered_reverse_reads,minLen = 10,maxN=0, maxEE=c(2,2), truncQ=0, rm.phix=TRUE,compress=F,matchIDs=TRUE, multithread=F)
+png("quality_profile_forward.png")
+plotQualityProfile(forward_reads[1:1])
+dev.off()
+png("quality_profile_reverse.png")
+plotQualityProfile(reverse_reads[1:1])
+dev.off()
+err_forward_reads <- learnErrors(filtered_forward_reads,multithread=F)
+err_reverse_reads <- learnErrors(filtered_reverse_reads,multithread=F)
+png("error_plot_forward.png")
+plotErrors(err_forward_reads, nominalQ=TRUE)
+dev.off()
+png("error_plot_reverse.png")
+plotErrors(err_reverse_reads, nominalQ=TRUE)
+dev.off()
+derep_forward <- derepFastq(filtered_forward_reads, verbose=TRUE)
+derep_reverse <- derepFastq(filtered_reverse_reads, verbose=TRUE)
+names(derep_forward) <- c("SNP44859")
+names(derep_reverse) <- c("SNP44859")
+dada_forward <- dada(derep_forward, err=err_forward_reads, multithread=F)
+dada_reverse <- dada(derep_reverse, err=err_reverse_reads, multithread=F)
+merged_amplicons <- mergePairs(dada_forward, derep_forward, dada_reverse, derep_reverse, returnRejects=TRUE, verbose=TRUE,minOverlap = 20, maxMismatch = 2)
+seqtab <- makeSequenceTable(merged_amplicons)
+seqtab.nochim <- removeBimeraDenovo(seqtab, method="consensus",verbose=T)
+sum(seqtab.nochim)/sum(seqtab)
+seqtab.nochim_df <- data.frame(sequence=colnames(seqtab.nochim), abundance=seqtab.nochim[1,]); rownames(seqtab.nochim_df) <- NULL
+dada2_taxa <- assignTaxonomy(seqtab.nochim_df, "silva_nr99_v138.1_train_set.fa.gz", multithread=FALSE)
+dada2_taxa <- addSpecies(dada2_taxa, "silva_species_assignment_v138.1.fa.gz")
+asv_tax <- data.frame(domain=dada2_taxa[,1], phylum=dada2_taxa[,2], class=dada2_taxa[,3], order=dada2_taxa[,4], family=dada2_taxa[,5], genus=dada2_taxa[,6], species=dada2_taxa[,7]); rownames(asv_tax) <- NULL
+#load("SILVA_SSU_r138_2019.RData")
+#dna <- DNAStringSet(getSequences(seqtab.nochim_df))
+#tax_info <- IdTaxa(test=dna, trainingSet=trainingSet, strand="both", processors=NULL)
+asv_seqs <- colnames(seqtab.nochim)
+asv_headers <- vector(dim(seqtab.nochim)[2], mode="character")
+for (i in 1:dim(seqtab.nochim)[2]) {
+asv_headers[i] <- paste(">ASV", i, sep="_")
+}
+asv_fasta <- c(rbind(asv_headers, asv_seqs))
+write(asv_fasta, "merged_ASVs.fa")
+asv_tab <- t(seqtab.nochim)
+row.names(asv_tab) <- sub(">", "", asv_headers)
+write.table(asv_tab, "merged_ASVs_counts.tsv", sep="\t", quote=F, col.names=NA)
+ranks <- c("domain", "phylum", "class", "order", "family", "genus", "species")
+#asv_tax <- t(sapply(tax_info, function(x){
+#m <- match(ranks, x$rank)
+#taxa <- x$taxon[m]
+#taxa[startsWith(taxa, "unclassified_")] <- NA
+#taxa
+#}))
+colnames(asv_tax) <- ranks
+rownames(asv_tax) <- gsub(pattern=">", replacement="", x=asv_headers)
+write.table(asv_tax, "merged_ASVs_taxonomy.tsv", sep = "\t", quote=F, col.names=NA)
+single_forward_reads<-c("SNP44859_S262_L001.singles_forward.fastq")
+filtered_single_forward_reads <- c("SNP44859_S262_L001.singles_forward_dada2filtered.fastq")
+filtered_out_single_forward <- filterAndTrim(single_forward_reads, filtered_single_forward_reads, minLen = 10, maxN=0, maxEE=c(2), truncQ=0, rm.phix=TRUE,compress=TRUE, multithread=FALSE)
+head(filtered_out_single_forward)
+err_single_forward_reads <- learnErrors(filtered_single_forward_reads,multithread=FALSE)
+png("error_plot_single_forward.png")
+plotErrors(err_single_forward_reads, nominalQ=TRUE)
+dev.off()
+derep_single_forward <- derepFastq(filtered_single_forward_reads, verbose=TRUE)
+names(derep_single_forward)<-c("SNP44859")
+dada_output_single_forward <- dada(derep_single_forward, err=err_single_forward_reads, multithread=FALSE)
+seqtab_single_forward <- makeSequenceTable(derep_single_forward)
+seqtab.nochim_single_forward <- removeBimeraDenovo(seqtab_single_forward, method="consensus",verbose=T)
+sum(seqtab.nochim_single_forward)/sum(seqtab_single_forward)
+seqtab.nochim_single_forward_df <- data.frame(sequence=colnames(seqtab.nochim_single_forward), abundance=seqtab.nochim_single_forward[1,]); rownames(seqtab.nochim_single_forward_df) <- NULL
+#dna_single_forward <- DNAStringSet(getSequences(seqtab.nochim_single_forward_df))
+#tax_info_single_forward <- IdTaxa(test=dna_single_forward, trainingSet=trainingSet, strand="both", processors=NULL)
+dada2_taxa_single_forward <- assignTaxonomy(seqtab.nochim_single_forward_df, "silva_nr99_v138.1_train_set.fa.gz", multithread=FALSE)
+dada2_taxa_single_forward <- addSpecies(dada2_taxa_single_forward, "silva_species_assignment_v138.1.fa.gz")
+asv_tax_single_forward <- data.frame(domain=dada2_taxa_single_forward[,1], phylum=dada2_taxa_single_forward[,2], class=dada2_taxa_single_forward[,3], order=dada2_taxa_single_forward[,4], family=dada2_taxa_single_forward[,5], genus=dada2_taxa_single_forward[,6], species=dada2_taxa_single_forward[,7]); rownames(asv_tax_single_forward) <- NULL
+asv_seqs_single_forward <- colnames(seqtab.nochim_single_forward)
+asv_headers_single_forward <- vector(dim(seqtab.nochim_single_forward)[2], mode="character")
+for (i in 1:dim(seqtab.nochim_single_forward)[2]) {
+	asv_headers_single_forward[i] <- paste(">ASV", i, sep="_")
+}
+asv_fasta_single_forward <- c(rbind(asv_headers_single_forward, asv_seqs_single_forward))
+write(asv_fasta_single_forward, "singles_forward_ASVs.fa")
+asv_tab_single_forward <- t(seqtab.nochim_single_forward)
+row.names(asv_tab_single_forward) <- sub(">", "", asv_headers_single_forward)
+write.table(asv_tab_single_forward, "singles_forward_ASVs_counts.tsv", sep="\t", quote=F, col.names=NA)
+#asv_tax_single_forward <-  t(sapply(tax_info_single_forward, function(x){
+#	m <- match(ranks, x$rank)
+#	taxa <- x$taxon[m]
+#	taxa[startsWith(taxa, "unclassified_")] <- NA
+#	taxa
+#}))
+colnames(asv_tax_single_forward) <- ranks
+rownames(asv_tax_single_forward) <- gsub(pattern=">", replacement="", x=asv_headers_single_forward)
+write.table(asv_tax_single_forward, "singles_forward_ASVs_taxonomy.tsv", sep = "\t", quote=F, col.names=NA)
+single_reverse_reads<-c("SNP44859_S262_L001.singles_reverse.fastq")
+filtered_single_reverse_reads <- c("SNP44859_S262_L001.singles_reverse_dada2filtered.fastq")
+filtered_out_single_reverse <- filterAndTrim(single_reverse_reads, filtered_single_reverse_reads, minLen = 10, maxN=0, maxEE=c(2), truncQ=0, rm.phix=TRUE,compress=TRUE, multithread=FALSE)
+head(filtered_out_single_reverse)
+err_single_reverse_reads <- learnErrors(filtered_single_reverse_reads,multithread=FALSE)
+png("error_plot_single_reverse.png")
+plotErrors(err_single_reverse_reads, nominalQ=TRUE)
+dev.off()
+derep_single_reverse <- derepFastq(filtered_single_reverse_reads, verbose=TRUE)
+names(derep_single_reverse)<-c("SNP44859")
+dada_output_single_reverse <- dada(derep_single_reverse, err=err_single_reverse_reads, multithread=FALSE)
+seqtab_single_reverse <- makeSequenceTable(derep_single_reverse)
+seqtab.nochim_single_reverse <- removeBimeraDenovo(seqtab_single_reverse, method="consensus",verbose=T)
+sum(seqtab.nochim_single_reverse)/sum(seqtab_single_reverse)
+seqtab.nochim_single_reverse_df <- data.frame(sequence=colnames(seqtab.nochim_single_reverse), abundance=seqtab.nochim_single_reverse[1,]); rownames(seqtab.nochim_single_reverse_df) <- NULL
+dada2_taxa_single_reverse <- assignTaxonomy(seqtab.nochim_single_reverse_df, "silva_nr99_v138.1_train_set.fa.gz", multithread=FALSE)
+dada2_taxa_single_reverse <- addSpecies(dada2_taxa_single_reverse, "silva_species_assignment_v138.1.fa.gz")
+asv_tax_single_reverse <- data.frame(domain=dada2_taxa_single_reverse[,1], phylum=dada2_taxa_single_reverse[,2], class=dada2_taxa_single_reverse[,3], order=dada2_taxa_single_reverse[,4], family=dada2_taxa_single_reverse[,5], genus=dada2_taxa_single_reverse[,6], species=dada2_taxa_single_reverse[,7]); rownames(asv_tax_single_reverse) <- NULL
+#dna_single_reverse <- DNAStringSet(getSequences(seqtab.nochim_single_reverse_df))
+#tax_info_single_reverse <- IdTaxa(test=dna_single_reverse, trainingSet=trainingSet, strand="both", processors=NULL)
+asv_seqs_single_reverse <- colnames(seqtab.nochim_single_reverse)
+asv_headers_single_reverse <- vector(dim(seqtab.nochim_single_reverse)[2], mode="character")
+for (i in 1:dim(seqtab.nochim_single_reverse)[2]) {
+	asv_headers_single_reverse[i] <- paste(">ASV", i, sep="_")
+}
+asv_fasta_single_reverse <- c(rbind(asv_headers_single_reverse, asv_seqs_single_reverse))
+write(asv_fasta_single_reverse, "singles_reverse_ASVs.fa")
+asv_tab_single_reverse <- t(seqtab.nochim_single_reverse)
+row.names(asv_tab_single_reverse) <- sub(">", "", asv_headers_single_reverse)
+write.table(asv_tab_single_reverse, "singles_reverse_ASVs_counts.tsv", sep="\t", quote=F, col.names=NA)
+#asv_tax_single_reverse <-  t(sapply(tax_info_single_reverse, function(x){
+#	m <- match(ranks, x$rank)
+#	taxa <- x$taxon[m]
+#	taxa[startsWith(taxa, "unclassified_")] <- NA
+#	taxa
+#}))
+colnames(asv_tax_single_reverse) <- ranks
+rownames(asv_tax_single_reverse) <- gsub(pattern=">", replacement="", x=asv_headers_single_reverse)
+write.table(asv_tax_single_reverse, "singles_reverse_ASVs_taxonomy.tsv", sep = "\t", quote=F, col.names=NA)
