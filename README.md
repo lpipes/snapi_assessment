@@ -2,9 +2,9 @@
 To run workflow use `bash commands.sh`<br>
 Dependencies: <br>
 ```
-fastq_quality_trimmer<br>
-dada2<br>
-ggplot2<br>
+fastq_quality_trimmer
+dada2
+ggplot2
 ```
 
 # Outputs
