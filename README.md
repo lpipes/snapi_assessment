@@ -1,5 +1,6 @@
 # snapi_assessment
 To run workflow use `bash commands.sh`<br>
+Download <a href="https://zenodo.org/record/4587955#.Yrx_YiZlDRY">Silva 138.1 prokaryotic SSU taxonomic training data formatted for DADA2</a><br>
 Dependencies: <br>
 ```
 fastq_quality_trimmer
